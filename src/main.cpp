@@ -28,7 +28,7 @@ void wait_key(bool* flag)
 int main()
 {
 
-	ProximitySensor HC_SO4("PA12", "PA11", 3);
+	ProximitySensor HC_SO4("PA11", "PA12", 3);
 	bool run_program;
 	run_program = true;
 

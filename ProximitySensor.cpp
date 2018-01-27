@@ -7,10 +7,11 @@
 
 #include "ProximitySensor.h"
 
-ProximitySensor::ProximitySensor(std::string trigger, std::string echo, int count_to_mean) : run_process(true), count_to_mean(count_to_mean), pin_trigger(trigger), pin_echo(echo), mean_value(0), sum_value(0)
+ProximitySensor::ProximitySensor(std::string trigger, std::string echo, int count_to_mean) : pin_trigger(trigger), pin_echo(echo), count_to_mean(count_to_mean), run_process(true), mean_value(0), sum_value(0)
 {
 	gpio_export(pin_trigger, "low");
 	gpio_export(pin_echo, "in");
+	gpio_set_event(pin_echo, "both");
 
 	my_thread.reset (new std::thread(&ProximitySensor::process, this));
 }
@@ -28,12 +29,12 @@ void ProximitySensor::process()
 	while(run_process)
 	{
 		send_initial_signial();
-		measure();
-		if(current_measure++ >= count_to_mean)
+		if(measure() == 0 && current_measure++ >= count_to_mean)
 		{
 			count_mean();
 			current_measure = 0;
 		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(30));
 	}
 }
 
@@ -58,28 +59,29 @@ void ProximitySensor::send_initial_signial()
 	gpio_set_value(pin_trigger, "0");
 }
 
-void ProximitySensor::measure()
+int ProximitySensor::measure()
 {
-	std::string value = "0";
-	gpio_get_value(pin_echo, value);
-	auto start = std::chrono::system_clock::now();
-	auto end = start;
-	while(value == "0" && std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() < 60)
+	std::string value;
+
+	if(gpio_wait_for_event(pin_echo, value, POLLPRI | POLLERR, ultra_sonic_pulse_timeout) > 0)
 	{
-		gpio_get_value(pin_echo, value);
-		end = std::chrono::system_clock::now();
+		auto start = std::chrono::system_clock::now();
+		auto end = start;
+
+		if(gpio_wait_for_event(pin_echo, value, POLLPRI | POLLERR, timeout) > 0)
+		{
+			end = std::chrono::system_clock::now();
+			sum_value += (double)std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 58;
+		}
+		else
+		{
+			sum_value--;
+		}
+
 	}
-	start = std::chrono::system_clock::now();
-	end = start;
-	while(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() < timeout && value == "1")
-	{
-		gpio_get_value(pin_echo, value);
-		end = std::chrono::system_clock::now();
-	}
-	if(value == "0")
-		sum_value += (double)std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 58;
 	else
-		sum_value--;
+		return -1;
+	return 0;
 }
 
 void ProximitySensor::end_measure()

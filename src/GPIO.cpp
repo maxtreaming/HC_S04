@@ -71,6 +71,19 @@ int gpio_unexport(std::string PNXX)
 
 }
 
+int gpio_set_event(std::string PNXX, std::string event)
+{
+	std::ofstream file("/sys/class/gpio/gpio" + get_port_pin(PNXX) + "/edge", std::ios::out);
+	if(file.is_open())
+	{
+		file << event;
+	}
+	else
+		return -1;
+	file.close();
+	return 0;
+}
+
 int gpio_set_value(std::string PNXX, std::string value)
 {
 	std::ofstream file("/sys/class/gpio/gpio" + get_port_pin(PNXX) + "/value", std::ios::out);
@@ -81,6 +94,7 @@ int gpio_set_value(std::string PNXX, std::string value)
 	else
 		return -1;
 	file.close();
+	return 0;
 }
 
 int gpio_get_value(std::string PNXX, std::string &value)
@@ -93,4 +107,34 @@ int gpio_get_value(std::string PNXX, std::string &value)
 	else
 		return -1;
 	file.close();
+	return 0;
+}
+
+int gpio_wait_for_event(std::string PNXX, std::string &value, short events, int timeout)
+{
+	int fd;
+	struct pollfd pfd;
+	int poll_ret;
+	char c;
+
+	fd = open(std::string("/sys/class/gpio/gpio" + get_port_pin(PNXX) + "/value").c_str(), O_RDONLY);
+	pfd.fd = fd;
+	pfd.events = events;
+	pfd.revents = 0;
+
+	lseek(fd, 0, SEEK_SET);
+	read(fd, &c, 1);
+
+	poll_ret = poll(&pfd, 1, timeout);
+
+	if(poll_ret > 0)
+	{
+		lseek(fd, 0, SEEK_SET);
+		read(fd, &c, 1);
+		value = c;
+	}
+
+	close(fd);
+
+	return poll_ret;
 }

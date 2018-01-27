@@ -15,7 +15,8 @@
 #include <atomic>
 #include "inc/GPIO.h"
 
-const int timeout = 12000; //milliseconds
+const int ultra_sonic_pulse_timeout = 60;
+const int timeout = 12; //milliseconds
 
 class ProximitySensor {
 private:
@@ -29,7 +30,7 @@ private:
 	void process();
 	void count_mean();
 	void send_initial_signial();
-	void measure();
+	int measure();
 
 public:
 	ProximitySensor(std::string trigger, std::string echo, int count_to_mean = 10);
